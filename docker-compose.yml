@@ -1,0 +1,45 @@
+version: "3.7"
+
+volumes:
+  postgres_data:
+      driver: local
+
+services:
+  postgres:
+    image: postgres
+    restart: always
+    volumes:
+        - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.1
+    hostname: keycloak
+    depends_on:
+      - postgres
+    command: start-dev
+    ports:
+      - "8080:8080"    
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres/keycloak
+      - KC_DB_USERNAME=user
+      - KC_DB_PASSWORD=password
+      - KC_HEALTH_ENABLED=true
+      - KC_FEATURES=dynamic-scopes,authorization
+    volumes:
+      - ./protocol-mapper/target/keycloak-authorization-protocol-mapper-example.jar:/opt/keycloak/providers/keycloak-authorization-protocol-mapper-example.jar:ro
+  health:
+    image: curlimages/curl
+    command: sleep infinity
+    depends_on:
+      - keycloak
+    healthcheck:
+      test: ["CMD", "curl", "--head", "-fsS", "http://keycloak:8080/health/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 50
